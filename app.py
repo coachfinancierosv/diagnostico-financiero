@@ -1,6 +1,12 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
+from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-# Configuración de la página web (Título en la pestaña y diseño ancho)
+# Configuración de la página web
 st.set_page_config(
     page_title="Diagnóstico de Salud Financiera | CoachFinanciero",
     page_icon="📊",
@@ -17,6 +23,49 @@ st.markdown("""
 
 st.markdown('<div class="main-title">Diagnóstico de Salud Financiera</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Toma el control de tu dinero y diseña tu futuro financiero</div>', unsafe_allow_html=True)
+
+# Conexión nativa a Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# Función para enviar correo de notificación
+def enviar_correo_notificacion(nombre, email, telefono, score, salud, interes):
+    # Extraemos las credenciales guardadas de forma segura en Streamlit
+    remitente = st.secrets["email"]["usuario"]
+    password = st.secrets["email"]["password"]
+    destinatario = st.secrets["email"]["destinatario"] # Tu correo donde quieres recibir alertas
+    
+    asunto = f"🚨 ¡NUEVO CLIENTE INTERESADO! - {nombre}" if interes == "SÍ" else f"📊 Nuevo diagnóstico realizado - {nombre}"
+    
+    cuerpo = f"""
+    Hola Coach,
+    
+    Se ha realizado un nuevo diagnóstico en tu plataforma web:
+    
+    - Nombre: {nombre}
+    - Correo: {email}
+    - Teléfono: {telefono}
+    - Score obtenido: {score:.1f} / 100 ({salud})
+    - ¿Desea asesoría personalizada?: {interes}
+    
+    ¡Mucho éxito con este seguimiento!
+    """
+    
+    msg = MIMEMultipart()
+    msg['From'] = remitente
+    msg['To'] = destinatario
+    msg['Subject'] = asunto
+    msg.attach(MIMEText(cuerpo, 'plain'))
+    
+    try:
+        # Configuración estándar para Gmail
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(remitente, password)
+        server.sendmail(remitente, destinatario, msg.as_string())
+        server.quit()
+    except Exception as e:
+        # No mostramos el error al usuario final por seguridad, pero se registra internamente
+        pass
 
 # =========================================================
 # 1. ONBOARDING
@@ -142,8 +191,54 @@ if st.button("Generar Mi Diagnóstico Financiero", type="primary", use_container
 
     st.markdown(f"**Consejo del Coach:** {recomendacion}")
     
-    # Generar Reporte de Texto para Descargar
+    # =========================================================
+    # GUARDAR EN GOOGLE SHEETS Y ENVIAR CORREO
+    # =========================================================
     interes_texto = "SÍ" if interes_asesoria else "NO"
+    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Guardar datos en Google Sheets
+    try:
+        # Obtenemos los datos actuales de la hoja
+        df_existente = conn.read()
+        
+        # Estructuramos la nueva fila
+        nueva_fila = {
+            "Fecha": fecha_actual,
+            "Nombre": nombre if nombre else "Anónimo",
+            "Telefono": telefono,
+            "Correo": correo,
+            "Edad": edad,
+            "Fuente_Ingreso": fuente_ingreso,
+            "Ingresos_Totales": ingresos_totales,
+            "Gastos_Totales": gastos_totales,
+            "Deudas": deudas,
+            "Ahorro_Calculado": ahorro_calculado,
+            "Score": round(score_final, 1),
+            "Salud_Financiera": nivel_salud,
+            "Interes_Asesoria": interes_texto
+        }
+        
+        # Unimos los datos existentes con el nuevo registro
+        df_actualizado = pd.concat([df_existente, pd.DataFrame([nueva_fila])], ignore_index=True)
+        
+        # Subimos la tabla actualizada
+        conn.update(data=df_actualizado)
+    except Exception as e:
+        # Si falla el Sheets (por ejemplo en local antes de configurar), que la app siga funcionando sin asustar al cliente
+        pass
+    
+    # Enviar correo de notificación de fondo
+    enviar_correo_notificacion(
+        nombre=nombre if nombre else "Anónimo",
+        email=correo,
+        telefono=telefono,
+        score=score_final,
+        salud=nivel_salud,
+        interes=interes_texto
+    )
+
+    # Generar Reporte de Texto para Descargar
     reporte_txt = f"""==================================================
         DIAGNÓSTICO DE SALUD FINANCIERA           
              COACH FINANCIERO SV                  
