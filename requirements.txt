@@ -1,1 +1,4 @@
-st-gsheets-connection
+streamlit>=1.28.0
+streamlit-gsheets
+pandas
+gspread
