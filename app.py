@@ -197,36 +197,33 @@ if st.button("Generar Mi Diagnóstico Financiero", type="primary", use_container
     interes_texto = "SÍ" if interes_asesoria else "NO"
     fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Guardar datos en Google Sheets
+    # Guardar datos en Google Sheets (Anexando fila para evitar sobreescritura)
     try:
-        # Obtenemos los datos actuales de la hoja
-        df_existente = conn.read()
+        # 1. Mapeamos las variables en una lista ordenada idéntica a tus columnas
+        nueva_fila_lista = [
+            fecha_actual,
+            nombre if nombre else "Anónimo",
+            telefono,
+            correo,
+            edad,
+            fuente_ingreso,
+            ingresos_totales,
+            gastos_totales,
+            deudas,
+            ahorro_calculado,
+            round(score_final, 1),
+            nivel_salud,
+            interes_texto
+        ]
         
-        # Estructuramos la nueva fila
-        nueva_fila = {
-            "Fecha": fecha_actual,
-            "Nombre": nombre if nombre else "Anónimo",
-            "Telefono": telefono,
-            "Correo": correo,
-            "Edad": edad,
-            "Fuente_Ingreso": fuente_ingreso,
-            "Ingresos_Totales": ingresos_totales,
-            "Gastos_Totales": gastos_totales,
-            "Deudas": deudas,
-            "Ahorro_Calculado": ahorro_calculado,
-            "Score": round(score_final, 1),
-            "Salud_Financiera": nivel_salud,
-            "Interes_Asesoria": interes_texto
-        }
+        # 2. Accedemos al cliente nativo e insertamos al final de la hoja
+        client = conn._client
+        sheet = client.open_by_url(st.secrets["connections"]["gsheets"]["spreadsheet"]).sheet1
+        sheet.append_row(nueva_fila_lista)
         
-        # Unimos los datos existentes con el nuevo registro
-        df_actualizado = pd.concat([df_existente, pd.DataFrame([nueva_fila])], ignore_index=True)
-        
-        # Subimos la tabla actualizada
-        conn.update(data=df_actualizado)
     except Exception as e:
-        # Si falla el Sheets (por ejemplo en local antes de configurar), que la app siga funcionando sin asustar al cliente
-        pass
+        # Mantiene la app corriendo si hay un fallo de red transitorio
+        pass    
     
     # Enviar correo de notificación de fondo
     enviar_correo_notificacion(
