@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
-from streamlit_gsheets import GSheetsConnection
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import gspread  # Conexión nativa directa
 
 # Configuración inicial de la página web
 st.set_page_config(
@@ -13,8 +13,17 @@ st.set_page_config(
     layout="centered"
 )
 
-# Inicializar la conexión con Google Sheets usando Secrets
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Conexión directa usando las credenciales de la Cuenta de Servicio de los Secrets
+try:
+    credenciales = dict(st.secrets["connections"]["gsheets"])
+    # Eliminamos el parámetro de la URL para que no interfiera con la autenticación
+    url_hoja = credenciales.pop("spreadsheet", None) 
+    
+    # Autenticación nativa en Google
+    gc = gspread.service_account_from_dict(credenciales)
+    sheet = gc.open_by_url(url_hoja).sheet1
+except Exception as e:
+    st.error(f"Error crítico de inicialización de base de datos: {e}")
 
 # Función para enviar notificaciones por correo electrónico de fondo
 def enviar_correo_notificacion(nombre, email, telefono, score, salud, interes):
@@ -161,27 +170,26 @@ if st.button("Generar Mi Diagnóstico Financiero", type="primary", use_container
     interes_texto = "SÍ" if interes_asesoria else "NO"
     fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Guardar datos en Google Sheets de forma segura
+    # Guardar datos en Google Sheets de forma segura (Anexando fila)
     try:
-        nuevo_registro = pd.DataFrame([{
-            "Fecha": fecha_actual,
-            "Nombre": nombre if nombre else "Anónimo",
-            "Telefono": telefono,
-            "Correo": correo,
-            "Edad": edad,
-            "Fuente_Ingreso": fuente_ingreso,
-            "Ingresos_Totales": ingresos_totales,
-            "Gastos_Totales": gastos_totales,
-            "Deudas": deudas,
-            "Ahorro_Calculado": ahorro_calculado,
-            "Score": round(score_final, 1),
-            "Salud_Financiera": nivel_salud,
-            "Interes_Asesoria": interes_texto
-        }])
+        nueva_fila = [
+            fecha_actual,
+            nombre if nombre else "Anónimo",
+            telefono,
+            correo,
+            edad,
+            fuente_ingreso,
+            ingresos_totales,
+            gastos_totales,
+            deudas,
+            ahorro_calculado,
+            round(score_final, 1),
+            nivel_salud,
+            interes_texto
+        ]
         
-        df_existente = conn.read()
-        df_completo = pd.concat([df_existente, nuevo_registro], ignore_index=True)
-        conn.update(data=df_completo)
+        # Inserción limpia al final de la hoja utilizando gspread
+        sheet.append_row(nueva_fila)
         
     except Exception as e:
         st.error(f"Error al registrar en la base de datos: {e}")
