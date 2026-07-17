@@ -1,143 +1,107 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# Configuración de la página web
+# Configuración inicial de la página web
 st.set_page_config(
-    page_title="Diagnóstico de Salud Financiera | CoachFinanciero",
+    page_title="Diagnóstico de Salud Financiera | Coach Financiero",
     page_icon="📊",
     layout="centered"
 )
 
-# Estilos visuales personalizados
-st.markdown("""
-    <style>
-    .main-title { font-size: 32px; font-weight: bold; color: #1e3a8a; text-align: center; margin-bottom: 20px; }
-    .sub-title { font-size: 16px; color: #4b5563; text-align: center; margin-bottom: 30px; }
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown('<div class="main-title">Diagnóstico de Salud Financiera</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Toma el control de tu dinero y diseña tu futuro financiero</div>', unsafe_allow_html=True)
-
-# Conexión nativa a Google Sheets
+# Inicializar la conexión con Google Sheets usando Secrets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Función para enviar correo de notificación
+# Función para enviar notificaciones por correo electrónico de fondo
 def enviar_correo_notificacion(nombre, email, telefono, score, salud, interes):
-    # Extraemos las credenciales guardadas de forma segura en Streamlit
-    remitente = st.secrets["email"]["usuario"]
-    password = st.secrets["email"]["password"]
-    destinatario = st.secrets["email"]["destinatario"] # Tu correo donde quieres recibir alertas
-    
-    asunto = f"🚨 ¡NUEVO CLIENTE INTERESADO! - {nombre}" if interes == "SÍ" else f"📊 Nuevo diagnóstico realizado - {nombre}"
-    
-    cuerpo = f"""
-    Hola Coach,
-    
-    Se ha realizado un nuevo diagnóstico en tu plataforma web:
-    
-    - Nombre: {nombre}
-    - Correo: {email}
-    - Teléfono: {telefono}
-    - Score obtenido: {score:.1f} / 100 ({salud})
-    - ¿Desea asesoría personalizada?: {interes}
-    
-    ¡Mucho éxito con este seguimiento!
-    """
-    
-    msg = MIMEMultipart()
-    msg['From'] = remitente
-    msg['To'] = destinatario
-    msg['Subject'] = asunto
-    msg.attach(MIMEText(cuerpo, 'plain'))
-    
     try:
-        # Configuración estándar para Gmail
+        usuario_envio = st.secrets["email"]["usuario"]
+        password_envio = st.secrets["email"]["password"]
+        destinatario = st.secrets["email"]["destinatario"]
+        
+        msg = MIMEMultipart()
+        msg['From'] = usuario_envio
+        msg['To'] = destinatario
+        msg['Subject'] = f"🚀 NUEVO DIAGNÓSTICO: {nombre} ({salud})"
+        
+        cuerpo_mensaje = f"""
+        Se ha registrado un nuevo diagnóstico financiero en la plataforma web.
+        
+        DATOS DEL PROSPECTO:
+        - Nombre completo: {nombre}
+        - Correo electrónico: {email}
+        - Teléfono de contacto: {telefono}
+        - ¿Desea una asesoría personalizada?: {interes}
+        
+        RESULTADO DEL DIAGNÓSTICO:
+        - Score Obtenido: {score:.1f} / 100 puntos
+        - Nivel de Salud Financiera: {salud}
+        
+        Inicia sesión en tu Google Sheets para ver el desglose completo de sus ingresos y gastos.
+        """
+        msg.attach(MIMEText(cuerpo_mensaje, 'plain'))
+        
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
-        server.login(remitente, password)
-        server.sendmail(remitente, destinatario, msg.as_string())
+        server.login(usuario_envio, password_envio)
+        server.sendmail(usuario_envio, destinatario, msg.as_string())
         server.quit()
-    except Exception as e:
-        # No mostramos el error al usuario final por seguridad, pero se registra internamente
-        pass
+    except Exception:
+        pass  # Evita que un fallo en el correo trabe la pantalla del usuario
 
-# =========================================================
-# 1. ONBOARDING
-# =========================================================
-st.subheader("📋 1. Datos de Onboarding")
+# INTERFAZ GRÁFICA DE LA APLICACIÓN
+st.image("https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=600", use_container_width=True)
+st.title("📊 Diagnóstico Instantáneo de Salud Financiera")
+st.write("Completa este breve formulario y recibe en tiempo real tu score de salud financiera y recomendaciones clave basadas en tu nivel de ingresos, gastos y endeudamiento.")
+
+st.markdown("---")
+
+# SECCIÓN 1: DATOS PERSONALES
+st.subheader("👤 1. Información General")
 col1, col2 = st.columns(2)
-
 with col1:
-    nombre = st.text_input("Nombre completo:", placeholder="Ej. Juan Pérez")
-    correo = st.text_input("Correo electrónico:", placeholder="ejemplo@correo.com")
-    fuente_ingreso = st.selectbox(
-        "Fuente de Ingresos principal:",
-        ["Empleado", "Profesional Independiente", "Dueño de Negocio", "Emprendedor"]
-    )
-
+    nombre = st.text_input("Nombre Completo:", placeholder="Ej. Juan Pérez")
+    correo = st.text_input("Correo Electrónico:", placeholder="ejemplo@correo.com")
 with col2:
-    telefono = st.text_input("Teléfono de contacto:", placeholder="Ej. +503 7000-0000")
-    edad = st.number_input("Edad:", min_value=0, max_value=120, value=30, step=1)
+    telefono = st.text_input("Número de Teléfono / WhatsApp:", placeholder="Ej. +503 7000-0000")
+    edad = st.number_input("Edad:", min_value=18, max_value=100, value=30, step=1)
 
-st.write("---")
+# SECCIÓN 2: FLUJO DE DINERO
+st.subheader("💰 2. Ingresos y Egresos Mensuales")
+fuente_ingreso = st.selectbox("Tu principal fuente de ingresos es:", ["Empleado asalariado", "Empresario / Comerciante", "Freelancer / Servicios Profesionales", "Remesas / Otros"])
 
-# =========================================================
-# 2. INGRESOS Y OBLIGACIONES
-# =========================================================
-st.subheader("💰 2. Ingresos y Obligaciones Mensuales")
-col3, col4, col5 = st.columns(3)
+c1, c2 = st.columns(2)
+with c1:
+    ingresos = st.number_input("Tus ingresos mensuales principales ($):", min_value=0.0, value=500.0, step=50.0)
+    otros_ingresos = st.number_input("Otros ingresos mensuales ($):", min_value=0.0, value=0.0, step=50.0)
+with c2:
+    g_vivienda = st.number_input("Vivienda (Alquiler o Hipoteca) ($):", min_value=0.0, value=150.0, step=25.0)
+    g_vida = st.number_input("Gastos de Vida (Comida, Servicios, Transporte) ($):", min_value=0.0, value=200.0, step=25.0)
 
-with col3:
-    ingresos = st.number_input("Ingresos Principales ($):", min_value=0.0, value=0.0, step=50.0)
-with col4:
-    otros_ingresos = st.number_input("Otros Ingresos ($):", min_value=0.0, value=0.0, step=50.0)
-with col5:
-    deudas = st.number_input("Cuotas de Deudas ($):", min_value=0.0, value=0.0, step=10.0)
+c3, c4 = st.columns(2)
+with c3:
+    g_educacion = st.number_input("Educación y Seguros ($):", min_value=0.0, value=0.0, step=25.0)
+    g_entretenimiento = st.number_input("Entretenimiento, salidas o lujos ($):", min_value=0.0, value=25.0, step=5.0)
+with c4:
+    g_ahorro = st.number_input("Ahorro o Inversión activa actual ($):", min_value=0.0, value=0.0, step=10.0)
+    deudas = st.number_input("Pago mensual total en deudas (Tarjetas, Créditos) ($):", min_value=0.0, value=50.0, step=10.0)
 
+# Cálculos automáticos internos
 ingresos_totales = ingresos + otros_ingresos
-
-st.write("---")
-
-# =========================================================
-# 3. DESGLOSE DE GASTOS (11 Variables)
-# =========================================================
-st.subheader("🛒 3. Desglose Mensual de Gastos")
-
-col_g1, col_g2 = st.columns(2)
-
-with col_g1:
-    g_viv = st.number_input("Alquiler/Hipoteca/Casa ($):", min_value=0.0, value=0.0, step=25.0)
-    g_trans = st.number_input("Transporte ($):", min_value=0.0, value=0.0, step=10.0)
-    g_ocio = st.number_input("Entretenimiento/Ocio ($):", min_value=0.0, value=0.0, step=10.0)
-    g_ropa = st.number_input("Ropa ($):", min_value=0.0, value=0.0, step=10.0)
-    g_susc = st.number_input("Suscripciones/Membresías ($):", min_value=0.0, value=0.0, step=5.0)
-
-with col_g2:
-    g_alim = st.number_input("Comida/Alimentación ($):", min_value=0.0, value=0.0, step=25.0)
-    g_educ = st.number_input("Educación ($):", min_value=0.0, value=0.0, step=25.0)
-    g_ahorro = st.number_input("Ahorro Mensual Fijo ($):", min_value=0.0, value=0.0, step=10.0)
-    g_sal = st.number_input("Salud/Cuidado Personal ($):", min_value=0.0, value=0.0, step=10.0)
-    g_varios = st.number_input("Gastos Varios ($):", min_value=0.0, value=0.0, step=10.0)
-
-gastos_totales = g_viv + g_alim + g_trans + g_educ + g_ocio + g_ropa + g_sal + g_susc + g_varios
+gastos_totales = g_vivienda + g_vida + g_educacion + g_entretenimiento
 ahorro_calculado = ingresos_totales - gastos_totales - deudas
 
-st.write("---")
+st.markdown("---")
 
-# =========================================================
-# 4. CIERRE Y CAPTACIÓN DE CLIENTES
-# =========================================================
-st.subheader("🤝 4. Próximos Pasos")
-interes_asesoria = st.checkbox(
-    "¿Estás interesado en recibir asesoría financiera para tomar el control de tu dinero?",
-    value=False
-)
+# SECCIÓN 3: LLAMADO A LA ACCIÓN
+st.subheader("🎯 3. ¿Cómo puedo ayudarte?")
+interes_asesoria = st.checkbox("Sí, me interesa recibir una sesión estratégica de planificación financiera para optimizar mi dinero.")
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # Botón para procesar todo
 if st.button("Generar Mi Diagnóstico Financiero", type="primary", use_container_width=True):
@@ -171,7 +135,7 @@ if st.button("Generar Mi Diagnóstico Financiero", type="primary", use_container
 
     st.write("## 📊 Tu Resultado de Diagnóstico")
     
-    # Tarjeta de Score Final utilizando el componente nativo de alertas de Streamlit
+    # Tarjeta de Score Final
     mensaje_score = f"**SCORE LOGRADO: {score_final:.1f} / 100 puntos (Salud Financiera: {nivel_salud})**"
     if color == "success":
         st.success(mensaje_score)
@@ -197,33 +161,30 @@ if st.button("Generar Mi Diagnóstico Financiero", type="primary", use_container
     interes_texto = "SÍ" if interes_asesoria else "NO"
     fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Guardar datos en Google Sheets (Anexando fila para evitar sobreescritura)
+    # Guardar datos en Google Sheets de forma segura
     try:
-        # 1. Mapeamos las variables en una lista ordenada idéntica a tus columnas
-        nueva_fila_lista = [
-            fecha_actual,
-            nombre if nombre else "Anónimo",
-            telefono,
-            correo,
-            edad,
-            fuente_ingreso,
-            ingresos_totales,
-            gastos_totales,
-            deudas,
-            ahorro_calculado,
-            round(score_final, 1),
-            nivel_salud,
-            interes_texto
-        ]
+        nuevo_registro = pd.DataFrame([{
+            "Fecha": fecha_actual,
+            "Nombre": nombre if nombre else "Anónimo",
+            "Telefono": telefono,
+            "Correo": correo,
+            "Edad": edad,
+            "Fuente_Ingreso": fuente_ingreso,
+            "Ingresos_Totales": ingresos_totales,
+            "Gastos_Totales": gastos_totales,
+            "Deudas": deudas,
+            "Ahorro_Calculado": ahorro_calculado,
+            "Score": round(score_final, 1),
+            "Salud_Financiera": nivel_salud,
+            "Interes_Asesoria": interes_texto
+        }])
         
-        # 2. Accedemos al cliente nativo e insertamos al final de la hoja
-        client = conn._client
-        sheet = client.open_by_url(st.secrets["connections"]["gsheets"]["spreadsheet"]).sheet1
-        sheet.append_row(nueva_fila_lista)
+        df_existente = conn.read()
+        df_completo = pd.concat([df_existente, nuevo_registro], ignore_index=True)
+        conn.update(data=df_completo)
         
     except Exception as e:
-        # Mantiene la app corriendo si hay un fallo de red transitorio
-        pass    
+        st.error(f"Error al registrar en la base de datos: {e}")
     
     # Enviar correo de notificación de fondo
     enviar_correo_notificacion(
